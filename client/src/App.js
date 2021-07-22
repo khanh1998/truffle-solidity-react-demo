@@ -6,25 +6,28 @@ import getWeb3 from "./getWeb3";
 import "./App.css";
 
 class App extends Component {
-  state = {
-    storageValue: 0,
-    web3: null,
-    accounts: null,
-    contract: { item: null, itemManager: null },
-    newItem: { cost: 0, itemName: "" }
-  };
+  constructor(props) {
+    super(props)
+    this.state = {
+      storageValue: 0,
+      web3: null,
+      accounts: null,
+      contract: { item: null, itemManager: null },
+      newItem: { cost: 0, itemName: "" }
+    }
+  }
 
   componentDidMount = async () => {
     try {
       // Get network provider and web3 instance.
-      const web3 = await getWeb3();
+      const web3 = await getWeb3()
 
       // Use web3 to get the user's accounts.
-      const accounts = await web3.eth.getAccounts();
+      const accounts = await web3.eth.getAccounts()
 
       // Get the contract instance.
-      const networkId = await web3.eth.net.getId();
-      const deployedNetwork = ItemManagerContract.networks[networkId];
+      const networkId = await web3.eth.net.getId()
+      const deployedNetwork = ItemManagerContract.networks[networkId]
       const ItemManagerInstance = new web3.eth.Contract(
         ItemManagerContract.abi,
         deployedNetwork && deployedNetwork.address,
@@ -40,22 +43,41 @@ class App extends Component {
         web3,
         accounts,
         contract: { item: ItemInstance, itemManager: ItemManagerInstance }
-      });
+      })
+      this.listenToEvent(
+      )
     } catch (error) {
       // Catch any errors for any of the above operations.
       alert(
         `Failed to load web3, accounts, or contract. Check console for details.`,
-      );
-      console.error(error);
+      )
+      console.error(error)
     }
   };
 
+  listenToEvent = () => {
+    const { itemManager } = this.state.contract
+    itemManager.events.SupplyChainStep().on('data', async (event) => {
+      console.log(event)
+      const res = await itemManager.methods.items(event.returnValues._index).call()
+      console.log(res)
+      const { id, price, item, state } = res;
+      let message = `was created, price is ${price}`
+      if (state === "1") {
+        message = `was paid for ${price} wei and ready to deliver`
+      }
+      if (state === "2") {
+        message = 'was delivered'
+      }
+      alert(`item ${id}-${item} : ${message}`)
+    })
+  }
   handleInputChange = (event) => {
-    const { target } = event;
-    const value = target.type === "checkbox" ? target.checked : target.value;
-    const { name } = target;
-    const { newItem: oldData } = this.state;
-    oldData[name] = value;
+    const { target } = event
+    const value = target.type === "checkbox" ? target.checked : target.value
+    const { name } = target
+    const { newItem: oldData } = this.state
+    oldData[name] = value
     this.setState({ newItem: { ...oldData } })
   }
 
@@ -65,17 +87,16 @@ class App extends Component {
     const fromAdd = this.state.accounts[0]
     console.log({ itemName, cost, fromAdd });
     const localItem = itemManager.methods.createItem(itemName, Number(cost))
-    console.log(localItem);
+    console.log(localItem)
     const response = await localItem.send({ from: fromAdd })
-    console.log(response);
+    console.log(response)
     const { returnValues } = response.events.SupplyChainStep
-    const { _index, _itemAddress, _step } = returnValues;
-    alert(`${_itemAddress}`)
+    const { _index, _itemAddress, _step } = returnValues
   }
 
   render() {
     if (!this.state.web3) {
-      return <div>Loading Web3, accounts, and contract...</div>;
+      return (<div>Loading Web3, accounts, and contract...</div>)
     }
     return (
       <div className="App">
